@@ -1,0 +1,108 @@
+---
+- name: Prepare and join server to ALD Pro domain
+  hosts: all
+  gather_facts: yes
+
+  vars:
+    aldpro_version: ""
+    aldpro_domain_name: ""
+    aldpro_domain_dns_server_ip: ""
+    aldpro_first_dc_install: false
+
+  tasks:
+    - name: update /etc/hostname
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/hostname
+        regexp: '^{{ ansible_hostname }}'
+        line: "{{ inventory_hostname }}"
+        backrefs: yes
+        
+    - name: update /etc/hosts
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        #regexp: '^127.0.1.1'
+        insertafter: '127.0.1.1	{{ ansible_hostname }}'
+        line: "{{ ansible_eth0.ipv4.address }}    {{ inventory_hostname }} {{ ansible_hostname }}"
+
+    - name: set Astra Linux Version
+      become: yes
+      set_fact:
+        astra_linux_version: "{{ lookup('file', '/etc/astra_version') }}" 
+
+    - name: update /etc/apt/sources.list
+      become: yes
+      ansible.builtin.template:
+        src: templates/astralinux.frozen.sources.list.j2
+        dest: /etc/apt/sources.list
+
+    - name: create /etc/apt/sources.list.d/aldpro.list
+      become: yes
+      ansible.builtin.template:
+        src: templates/aldpro.sources.list.j2
+        dest: /etc/apt/sources.list.d/aldpro.list
+
+    - name: copy /etc/apt/preferences.d/aldpro
+      become: yes
+      ansible.builtin.copy:
+        src: files/apt_preferences_aldpro
+        dest: /etc/apt/preferences.d/aldpro
+
+    - name: apt update and upgrade
+      become: yes
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Reboot server
+      become: yes
+      ansible.builtin.reboot:
+        reboot_timeout: 4600
+
+    - name: install ALD Pro First DC
+      become: yes
+      ansible.builtin.apt:
+        name: aldpro-mp
+      environment:
+        DEBIAN_FRONTEND: noninteractive 
+      when: aldpro_first_dc_install | bool
+
+    - name: install ALD Pro Client
+      become: yes
+      ansible.builtin.apt:
+        name: aldpro-client
+      environment:
+        DEBIAN_FRONTEND: noninteractive 
+      when: not aldpro_first_dc_install
+
+    - name: copy /etc/resolv.conf
+      become: yes
+      ansible.builtin.template:
+        src: templates/aldpro_resolv_conf.j2
+        dest: /etc/resolv.conf
+
+    - name: Modify /etc/network/interfaces on first ALD Pro 
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        regexp: '^dns-nameservers'
+        insertbefore: BOF
+        line: 'dns-nameservers 127.0.0.1'
+      when: aldpro_first_dc_install | bool
+
+    - name: Modify /etc/network/interfaces on DC ALD Pro Client
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        regexp: '^dns-nameservers'
+        insertbefore: BOF
+        line: 'dns-nameservers {{ aldpro_domain_dns_server_ip }}'
+      when: not aldpro_first_dc_install
+
+    - name: Reboot server
+      become: yes
+      ansible.builtin.reboot:
+        reboot_timeout: 4600
+
+
