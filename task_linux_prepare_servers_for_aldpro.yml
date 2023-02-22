@@ -8,6 +8,8 @@
     aldpro_domain_name: ""
     aldpro_domain_dns_server_ip: ""
     aldpro_first_dc_install: false
+    aldpro_client_packet_name: ""
+    aldpro_first_dc_packet_name: ""
 
   tasks:
     - name: update /etc/hostname
@@ -34,19 +36,19 @@
     - name: update /etc/apt/sources.list
       become: yes
       ansible.builtin.template:
-        src: templates/astralinux.frozen.sources.list.j2
+        src: templates/astralinux_apt_sources_list.j2
         dest: /etc/apt/sources.list
 
     - name: create /etc/apt/sources.list.d/aldpro.list
       become: yes
       ansible.builtin.template:
-        src: templates/aldpro.sources.list.j2
+        src: templates/aldpro_apt_sources_list.j2
         dest: /etc/apt/sources.list.d/aldpro.list
 
     - name: copy /etc/apt/preferences.d/aldpro
       become: yes
       ansible.builtin.copy:
-        src: files/apt_preferences_aldpro
+        src: files/aldpro_apt_preferences
         dest: /etc/apt/preferences.d/aldpro
 
     - name: apt update and upgrade
@@ -63,7 +65,7 @@
     - name: install ALD Pro First DC
       become: yes
       ansible.builtin.apt:
-        name: aldpro-mp
+        name: "{{ aldpro_first_dc_packet_name }}"
       environment:
         DEBIAN_FRONTEND: noninteractive 
       when: aldpro_first_dc_install | bool
@@ -71,7 +73,7 @@
     - name: install ALD Pro Client
       become: yes
       ansible.builtin.apt:
-        name: aldpro-client
+        name: "{{ aldpro_client_packet_name }}"
       environment:
         DEBIAN_FRONTEND: noninteractive 
       when: not aldpro_first_dc_install

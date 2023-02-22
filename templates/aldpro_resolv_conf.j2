@@ -1,0 +1,2 @@
+search {{ aldpro_domain_name }}
+{% if not aldpro_first_dc_install  %}nameserver {{ aldpro_domain_dns_server_ip }}{% else %}nameserver 127.0.0.1{% endif %}
